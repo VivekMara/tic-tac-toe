@@ -2,15 +2,17 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"tic-tac-toe/cmd/helpers"
+	masterserver "tic-tac-toe/cmd/master_server"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	// Load .env file
-	err := godotenv.Load("../.env")
+	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
@@ -38,4 +40,12 @@ func main() {
 	defer database.Conn.Close()
 
 	log.Println("Database connection established and table created successfully")
+
+	//routes
+	http.HandleFunc("/", helpers.Root)
+	http.HandleFunc("/auth/v1/register", masterserver.Register)
+
+	//server
+	log.Println("Server starting on port 6969")
+	log.Fatal(http.ListenAndServe(":6969", nil))
 }

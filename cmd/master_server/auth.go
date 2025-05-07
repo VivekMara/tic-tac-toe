@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
@@ -19,10 +20,13 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-func HashPassword() string {
-	return "Hello Auth"
+var db *helpers.Database
+
+func hash(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
 }
-func Register(w http.ResponseWriter, r *http.Request, db *helpers.Database) {
+func Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		helpers.SendErrorResponse(w, "Invalid method", nil, http.StatusMethodNotAllowed)
 	} else {
@@ -36,7 +40,10 @@ func Register(w http.ResponseWriter, r *http.Request, db *helpers.Database) {
 			helpers.SendErrorResponse(w, "Error decoding request", err, http.StatusInternalServerError)
 		}
 
-		hashedPass := HashPassword()
+		hashedPass, err := hash(input.Password)
+		if err != nil {
+			helpers.SendErrorResponse(w, "Error hashing the password", err, http.StatusInternalServerError)
+		}
 		current_time := time.Now()
 
 		var user = User{
@@ -54,7 +61,6 @@ func Register(w http.ResponseWriter, r *http.Request, db *helpers.Database) {
 		}
 
 		helpers.SendSuccessResponse(w, "Successfully created a new user", user)
-
 	}
 }
 func Login() {
