@@ -20,7 +20,7 @@ type User struct {
 }
 
 func HashPassword() string {
-
+	return "Hello Auth"
 }
 func Register(w http.ResponseWriter, r *http.Request, db *helpers.Database) {
 	if r.Method != "POST" {
