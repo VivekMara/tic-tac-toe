@@ -2,27 +2,13 @@ package main
 
 import (
 	"log"
+	"fmt"
 	"net/http"
-	"os"
-	"tic-tac-toe/cmd/helpers"
 	masterserver "tic-tac-toe/cmd/master_server"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Load .env file
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
-	}
-
-	// DB initialization
-	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASSWORD")
-	dbName := os.Getenv("DB_NAME")
-	port := os.Getenv("DB_PORT")
-
+	tables := make([]string,0)
 	stmt := `
 	CREATE TABLE IF NOT EXISTS users (
 		id SERIAL PRIMARY KEY,
@@ -32,17 +18,20 @@ func main() {
 		created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
-
-	database, err := helpers.New(dbUser, dbPass, port, dbName, stmt)
+	tables = append(tables, stmt)
+	err := masterserver.Create_tables(tables)
 	if err != nil {
-		log.Fatalf("Database initialization failed: %v", err)
+		err_stmt := fmt.Sprintf("Failed to create tables!! with error: %s", err)
+		log.Println(err_stmt)
+	} else {
+		log.Println("Database connection established and table created successfully")
 	}
-	defer database.Conn.Close()
-
-	log.Println("Database connection established and table created successfully")
 
 	//routes
-	http.HandleFunc("/", helpers.Root)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		resp := []byte("Hello Darthman")
+		w.Write(resp)
+	})
 	http.HandleFunc("/auth/v1/register", masterserver.Register)
 
 	//server

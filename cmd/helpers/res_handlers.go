@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 )
 
@@ -34,13 +33,4 @@ func SendErrorResponse(w http.ResponseWriter, message string, err error, statusC
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(response)
-}
-
-func Root(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		SendErrorResponse(w, "Invalid http method", nil, http.StatusMethodNotAllowed)
-	} else {
-		SendSuccessResponse(w, "Hello darthman", nil)
-		log.Println(r.RemoteAddr)
-	}
 }
