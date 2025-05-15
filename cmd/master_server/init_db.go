@@ -18,7 +18,7 @@ func Create_tables(tables []string) error {
 	db_user := os.Getenv("DB_USER")
 	pass := os.Getenv("DB_PASSWORD")
 
-	conn_str := fmt.Sprintf("postgres://%s:%s@127.0.0.1:59274/%s?sslmode=disable", db_user, pass, db_name)
+	conn_str := fmt.Sprintf("postgres://%s:%s@127.0.0.1:61587/%s?sslmode=disable", db_user, pass, db_name)
 
 	db, err = sql.Open("postgres", conn_str)
 

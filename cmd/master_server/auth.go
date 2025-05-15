@@ -1,16 +1,17 @@
 package masterserver
 
 import (
-	"encoding/json"
 	"database/sql"
-	"fmt"
+	"encoding/json"
 	"net/http"
+	"strings"
 	"tic-tac-toe/cmd/helpers"
 	"time"
-	"strings"
+    "net"
 
-	"golang.org/x/crypto/bcrypt"
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
+    "github.com/google/uuid"
 )
 
 type User struct {
@@ -79,14 +80,111 @@ func Register(w http.ResponseWriter, r *http.Request) {
         }
         return
     }
+    var userID int
+    row := db.QueryRow("SELECT id FROM users WHERE email = $1", user.Email)
+    err = row.Scan(&userID)
+    if err != nil {
+        helpers.SendErrorResponse(w, "Error scanning rows", err, http.StatusInternalServerError)
+        return
+    }
 
+    ipAddr := r.RemoteAddr
+    host, _, err := net.SplitHostPort(ipAddr)
+    if err != nil {
+        host = ""
+    }
+    user_agent := r.UserAgent()
+    sessionID := uuid.New().String()
+    _, err = db.Exec("INSERT INTO sessions (session_id, user_id, created_at, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5, $6)",sessionID, userID, time.Now(), time.Now().Add(1*time.Hour), host, user_agent)
+    if err != nil {
+        helpers.SendErrorResponse(w, "Error creating a session", err, http.StatusInternalServerError)
+        return
+    }
+    http.SetCookie(w, &http.Cookie{
+        Name: "session_id",
+        Value:    sessionID,
+        Expires:  time.Now().Add(24 * time.Hour),
+        HttpOnly: true,
+        Secure:   true,
+        SameSite: http.SameSiteLaxMode,
+    })
     helpers.SendSuccessResponse(w, "Successfully created a new user", user)
 }
 
-func Login() {
-	fmt.Println("Hello auth")
+func Login(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+        helpers.SendErrorResponse(w, "Invalid http method", nil, http.StatusMethodNotAllowed)
+    } else {
+        var input struct {
+            Username string `json:"username"`
+            Password string `json:"password"`
+        }
+
+        err := json.NewDecoder(r.Body).Decode(&input)
+        if err != nil {
+            helpers.SendErrorResponse(w, "Error decoding request", err, http.StatusBadRequest)
+            return
+        }
+
+        if input.Username == "" || input.Password == "" {
+            helpers.SendErrorResponse(w, "All fields are required", nil, http.StatusBadRequest)
+            return
+        }
+
+        var hashedPass string
+        var userID int
+        row := db.QueryRow("SELECT id, password_hash FROM users WHERE username = $1", input.Username)
+        err = row.Scan(&userID, &hashedPass)
+        if err != nil {
+            helpers.SendErrorResponse(w, "Error scanning rows", err, http.StatusInternalServerError)
+            return
+        }
+        err = bcrypt.CompareHashAndPassword([]byte(hashedPass), []byte(input.Password))
+        if err != nil {
+            helpers.SendErrorResponse(w, "Wrong password", err, http.StatusBadRequest)
+        } else {
+            ipAddr := r.RemoteAddr
+            host, _, err := net.SplitHostPort(ipAddr)
+            if err != nil {
+                ipAddr = ""
+            }
+            user_agent := r.UserAgent()
+            sessionID := uuid.New().String()
+            _, err = db.Exec("INSERT INTO sessions (session_id, user_id, created_at, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5, $6)",sessionID, userID, time.Now(), time.Now().Add(1*time.Hour), host, user_agent)
+            if err != nil {
+                helpers.SendErrorResponse(w, "Error creating a session", err, http.StatusInternalServerError)
+                return
+            }
+            http.SetCookie(w, &http.Cookie{
+                Name: "session_id",
+                Value:    sessionID,
+                Expires:  time.Now().Add(24 * time.Hour),
+                HttpOnly: true,
+                Secure:   true,
+                SameSite: http.SameSiteLaxMode,
+            })
+            helpers.SendSuccessResponse(w, "Login successfull", nil)
+        }
+    }
 }
 
-func Logout() {
-	fmt.Println("Hello auth")
+func Logout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+        helpers.SendErrorResponse(w, "Invalid http method", nil, http.StatusMethodNotAllowed)
+    } else {
+        cookie, err := r.Cookie("session_id")
+        if err == nil {
+        _, _ = db.Exec("DELETE FROM sessions WHERE session_id = $1", cookie.Value)
+        }
+        http.SetCookie(w, &http.Cookie{
+            Name:     "session_id",
+            Value:    "",
+            Expires:  time.Unix(0, 0),
+            MaxAge:   -1,
+            HttpOnly: true,
+            Secure:   true,
+            SameSite: http.SameSiteLaxMode,
+        })
+        helpers.SendSuccessResponse(w, "User successfully logged out", nil)
+    }
 }
